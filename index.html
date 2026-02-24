@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>請求書生成 - 井上茉奈 → 美高商事</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -36,9 +36,9 @@
   }
   #btn-calc { background: #e94560; color: #fff; }
   #btn-calc:hover, #btn-calc:active { background: #c73652; }
-  #btn-pdf { background: #0f3460; color: #fff; }
-  #btn-pdf:hover, #btn-pdf:active { background: #16213e; }
-  #btn-pdf:disabled { opacity: 0.4; cursor: not-allowed; }
+  #btn-save { background: #0f3460; color: #fff; }
+  #btn-save:hover, #btn-save:active { background: #16213e; }
+  #btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
   #msg-area { width: 100%; min-height: 18px; }
   #error-msg { color: #ff6b6b; font-size: 13px; font-family: sans-serif; }
   #success-msg { color: #51cf66; font-size: 13px; font-family: sans-serif; }
@@ -58,6 +58,42 @@
     margin-top: 16px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== 画像保存モーダル ===== */
+  #img-modal {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000; justify-content: center; align-items: center;
+  }
+  .img-modal-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+  }
+  .img-modal-content {
+    position: relative; z-index: 1; max-width: 92vw; max-height: 90vh;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 16px;
+  }
+  .img-modal-hint {
+    color: #fff; font-size: 16px; font-family: sans-serif;
+    text-align: center; margin: 0;
+  }
+  #img-modal-img {
+    max-width: 88vw; max-height: 65vh;
+    border: 3px solid #fff; border-radius: 4px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+    -webkit-user-select: none; user-select: none;
+  }
+  .img-modal-close {
+    background: #555; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 32px; font-size: 15px; font-family: sans-serif;
+    cursor: pointer; width: 100%; max-width: 300px;
+  }
+  .img-modal-dlbtn {
+    background: #e94560; color: #fff; border: none; border-radius: 8px;
+    padding: 12px 32px; font-size: 15px; font-family: sans-serif;
+    cursor: pointer; text-decoration: none; text-align: center;
+    width: 100%; max-width: 300px; display: block; font-weight: bold;
+  }
 
   /* ===== 請求書プレビュー ===== */
   #preview-area {
@@ -170,7 +206,7 @@
   </div>
   <div class="btn-group">
     <button id="btn-calc" onclick="calculate()">計算・プレビュー</button>
-    <button id="btn-pdf" onclick="generatePDF()" disabled>PDF出力</button>
+    <button id="btn-save" onclick="saveImage()" disabled>📷 画像保存</button>
   </div>
   <div id="msg-area">
     <div id="error-msg"></div>
@@ -178,7 +214,7 @@
   </div>
 </div>
 
-<div id="loading-overlay"><div class="spinner"></div><p>PDF生成中...</p></div>
+<div id="loading-overlay"><div class="spinner"></div><p>画像生成中...</p></div>
 
 <div id="preview-area">
   <div id="invoice">
@@ -433,22 +469,22 @@ function calculate() {
   }
 
   renderInvoice(lines, subtotal, tax, amount);
-  document.getElementById('btn-pdf').disabled = false;
+  document.getElementById('btn-save').disabled = false;
 
   const discLine = lines.find(l => l.isDiscount);
   const discMsg = discLine ? `（値引き ${formatNum(discLine.price)}円）` : '';
   sucEl.textContent = `✓ 小計 ¥${formatNum(subtotal)} + 税 ¥${formatNum(tax)} = ¥${formatNum(amount)} ${discMsg}`;
 }
 
-function generatePDF() {
+function saveImage() {
   const el = document.getElementById('invoice');
   const panel = document.getElementById('input-panel');
   const loader = document.getElementById('loading-overlay');
 
-  // ローディング表示
+  loader.querySelector('p').textContent = '画像生成中...';
   loader.classList.add('show');
 
-  // モバイルのCSS transformを一時解除してフルサイズでキャプチャ
+  // モバイルのCSS transformを一時解除
   const origTransform = el.style.transform;
   const origTransformOrigin = el.style.transformOrigin;
   const origMarginBottom = el.style.marginBottom;
@@ -475,22 +511,50 @@ function generatePDF() {
   }
 
   setTimeout(() => {
-    html2pdf().set({
-      margin: 0,
-      filename: '請求書_美高商事宛_井上茉奈.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: 810,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(el).save().then(restore).catch(restore);
+    html2canvas(el, {
+      scale: 3,
+      useCORS: true,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
+      windowWidth: 810,
+      scrollX: 0,
+      scrollY: 0,
+      backgroundColor: '#ffffff'
+    }).then(canvas => {
+      restore();
+
+      // 画像をプレビュー表示 → 長押し保存を促す
+      const dataUrl = canvas.toDataURL('image/png');
+
+      // モーダルで画像表示
+      let modal = document.getElementById('img-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'img-modal';
+        modal.innerHTML = `
+          <div class="img-modal-bg" onclick="closeImgModal()"></div>
+          <div class="img-modal-content">
+            <p class="img-modal-hint">📱 画像を長押しして保存してください</p>
+            <img id="img-modal-img" src="" alt="請求書">
+            <button class="img-modal-close" onclick="closeImgModal()">✕ 閉じる</button>
+            <a id="img-modal-dl" href="" download="請求書_美高商事宛_井上茉奈.png" class="img-modal-dlbtn">⬇ ダウンロード</a>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+      document.getElementById('img-modal-img').src = dataUrl;
+      document.getElementById('img-modal-dl').href = dataUrl;
+      modal.style.display = 'flex';
+    }).catch(() => {
+      restore();
+      document.getElementById('error-msg').textContent = '⚠ 画像生成に失敗しました';
+    });
   }, 100);
+}
+
+function closeImgModal() {
+  const modal = document.getElementById('img-modal');
+  if (modal) modal.style.display = 'none';
 }
 </script>
 </body>
