@@ -2,234 +2,221 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>請求書生成 - 井上茉奈 → 美高商事</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>請求書生成</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Yu Mincho', 'Hiragino Mincho ProN', 'MS PMincho', serif;
-    background: #f0f0f0; color: #222;
+    background: #e8e8e8; color: #222;
   }
 
   /* ===== 入力パネル ===== */
   #input-panel {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: #1a1a2e; color: #fff; padding: 12px 16px;
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    background: #1a1a2e; color: #fff; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
   }
-  #input-panel label { font-size: 12px; font-family: sans-serif; display: block; margin-bottom: 4px; }
-  #input-panel .input-group { flex: 1; min-width: 120px; }
-  #input-panel input {
-    padding: 10px 12px; border: none; border-radius: 8px;
-    font-size: 16px; width: 100%; background: #fff; color: #222;
+  .input-row {
+    display: flex; gap: 10px;
+  }
+  .input-row .field { flex: 1; }
+  .input-row .field label {
+    font-size: 11px; font-family: sans-serif; display: block; margin-bottom: 4px; opacity: 0.8;
+  }
+  .input-row .field input {
+    width: 100%; padding: 10px; border: none; border-radius: 6px;
+    font-size: 16px; background: #fff; color: #222;
     -webkit-appearance: none;
   }
-  #input-panel .btn-group {
-    display: flex; gap: 8px; width: 100%;
-  }
-  #input-panel button {
-    flex: 1; padding: 12px 16px; border: none; border-radius: 8px;
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row button {
+    flex: 1; padding: 13px 10px; border: none; border-radius: 8px;
     font-size: 15px; font-weight: bold; cursor: pointer;
-    font-family: sans-serif; transition: all 0.2s;
+    font-family: sans-serif;
   }
   #btn-calc { background: #e94560; color: #fff; }
-  #btn-calc:hover, #btn-calc:active { background: #c73652; }
   #btn-save { background: #0f3460; color: #fff; }
-  #btn-save:hover, #btn-save:active { background: #16213e; }
-  #btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
-  #msg-area { width: 100%; min-height: 18px; }
-  #error-msg { color: #ff6b6b; font-size: 13px; font-family: sans-serif; }
-  #success-msg { color: #51cf66; font-size: 13px; font-family: sans-serif; }
-  #loading-overlay {
-    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.6); z-index: 9999;
-    justify-content: center; align-items: center; flex-direction: column;
-  }
-  #loading-overlay.show { display: flex; }
-  #loading-overlay .spinner {
-    width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3);
-    border-top-color: #e94560; border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  #loading-overlay p {
-    color: #fff; font-size: 16px; font-family: sans-serif;
-    margin-top: 16px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  #btn-save:disabled { opacity: 0.35; }
+  #msg { font-size: 12px; font-family: sans-serif; min-height: 16px; text-align: center; }
+  #msg.ok { color: #51cf66; }
+  #msg.err { color: #ff6b6b; }
 
-  /* ===== 画像保存モーダル ===== */
-  #img-modal {
-    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 10000; justify-content: center; align-items: center;
-  }
-  .img-modal-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85);
-  }
-  .img-modal-content {
-    position: relative; z-index: 1; max-width: 92vw; max-height: 90vh;
-    display: flex; flex-direction: column; align-items: center; gap: 12px;
-    padding: 16px;
-  }
-  .img-modal-hint {
-    color: #fff; font-size: 16px; font-family: sans-serif;
-    text-align: center; margin: 0;
-  }
-  #img-modal-img {
-    max-width: 88vw; max-height: 65vh;
-    border: 3px solid #fff; border-radius: 4px;
-    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
-    -webkit-user-select: none; user-select: none;
-  }
-  .img-modal-close {
-    background: #555; color: #fff; border: none; border-radius: 8px;
-    padding: 10px 32px; font-size: 15px; font-family: sans-serif;
-    cursor: pointer; width: 100%; max-width: 300px;
-  }
-  .img-modal-dlbtn {
-    background: #e94560; color: #fff; border: none; border-radius: 8px;
-    padding: 12px 32px; font-size: 15px; font-family: sans-serif;
-    cursor: pointer; text-decoration: none; text-align: center;
-    width: 100%; max-width: 300px; display: block; font-weight: bold;
+  /* ===== プレビューエリア ===== */
+  #preview-wrap {
+    padding: 12px; display: flex; justify-content: center;
   }
 
-  /* ===== 請求書プレビュー ===== */
-  #preview-area {
-    margin-top: 180px; padding: 10px;
-    display: flex; justify-content: center;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-  }
-
-  @media (min-width: 769px) {
-    #input-panel { padding: 16px 24px; gap: 20px; }
-    #input-panel .input-group { flex: 0 0 auto; min-width: 180px; }
-    #input-panel input { width: 180px; }
-    #input-panel .btn-group { width: auto; }
-    #input-panel button { flex: 0 0 auto; padding: 10px 28px; }
-    #preview-area { margin-top: 90px; padding: 20px; }
-  }
-
-  @media (max-width: 768px) {
-    #invoice {
-      transform: scale(0.48); transform-origin: top left;
-      margin-bottom: -150mm;
-    }
-    #preview-area {
-      margin-top: 200px;
-      justify-content: flex-start;
-      padding: 10px 6px;
-    }
-  }
-  @media (max-width: 480px) {
-    #invoice {
-      transform: scale(0.38); transform-origin: top left;
-      margin-bottom: -180mm;
-    }
-    #preview-area { margin-top: 210px; }
-  }
+  /* 請求書本体: 固定ピクセルサイズ (A4比率 210:297 → 794:1123px @96dpi) */
   #invoice {
-    width: 210mm; min-height: 297mm; max-height: 297mm;
-    background: #fff; padding: 18mm 18mm 15mm 18mm;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    position: relative; overflow: hidden;
+    width: 794px; height: 1123px;
+    background: #fff;
+    padding: 68px 68px 50px 68px;
+    position: relative;
+    font-size: 14px;
+    line-height: 1.6;
+    transform-origin: top center;
   }
 
+  /* モバイルスケーリング */
+  @media (max-width: 820px) {
+    #preview-wrap { padding: 8px; }
+    #invoice {
+      /* JSでscaleを動的セット */
+    }
+  }
+
+  /* ===== 請求書内部スタイル ===== */
   .inv-title {
-    text-align: center; font-size: 28px; font-weight: bold;
-    letter-spacing: 12px; margin-bottom: 20px;
-    border-bottom: 3px double #333; padding-bottom: 10px;
+    text-align: center; font-size: 30px; font-weight: bold;
+    letter-spacing: 14px; margin-bottom: 24px;
+    border-bottom: 3px double #333; padding-bottom: 12px;
   }
-  .inv-header {
-    display: flex; justify-content: space-between; margin-bottom: 18px;
-  }
+  .inv-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
   .inv-header-left { flex: 1; }
-  .inv-header-right { text-align: right; font-size: 13px; line-height: 1.8; }
-  .inv-to { font-size: 15px; margin-bottom: 4px; }
+  .inv-header-right { text-align: right; font-size: 13px; line-height: 2; }
+  .inv-to-label { font-size: 13px; margin-bottom: 2px; }
   .inv-to-name {
     font-size: 22px; font-weight: bold;
     border-bottom: 2px solid #333; padding-bottom: 4px;
-    display: inline-block; padding-right: 20px; margin-bottom: 10px;
+    display: inline-block; padding-right: 16px; margin-bottom: 4px;
   }
-  .inv-to-sama { font-size: 15px; font-weight: normal; margin-left: 8px; }
+  .inv-to-suffix { font-size: 15px; font-weight: normal; margin-left: 6px; }
+  .inv-to-addr { font-size: 13px; margin-top: 4px; }
+
   .inv-from {
-    text-align: right; font-size: 13px; line-height: 1.9; margin-bottom: 18px;
+    text-align: right; font-size: 13px; line-height: 2; margin-bottom: 20px;
   }
-  .inv-from-name { font-size: 17px; font-weight: bold; }
+  .inv-from-name { font-size: 18px; font-weight: bold; }
 
-  .inv-table {
-    width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px;
-  }
-  .inv-table thead th {
+  .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .inv-table th {
     background: #2c3e50; color: #fff;
-    padding: 7px 8px; font-weight: bold; text-align: center; font-size: 12px;
+    padding: 8px 10px; font-weight: bold; text-align: center; font-size: 12px;
+    white-space: nowrap;
   }
-  .inv-table tbody td {
-    padding: 5px 8px; border-bottom: 1px solid #ddd; text-align: center;
+  .inv-table td {
+    padding: 6px 10px; border-bottom: 1px solid #ddd;
+    text-align: center; font-size: 13px; white-space: nowrap;
   }
-  .inv-table tbody td:nth-child(2) { text-align: left; }
-  .inv-table tbody td:last-child { text-align: right; }
-  .inv-table tbody td:nth-child(4),
-  .inv-table tbody td:nth-child(6) { text-align: right; }
-  .inv-table tbody tr.empty-row td { color: #ccc; height: 22px; }
-  .inv-table tbody tr.discount-row td { color: #c0392b; font-weight: bold; }
+  .inv-table td:nth-child(2) { text-align: left; }
+  .inv-table td:nth-child(4), .inv-table td:nth-child(6) { text-align: right; }
+  .inv-table td:last-child { text-align: right; }
+  .inv-table tr.empty td { color: #ccc; height: 24px; }
+  .inv-table tr.disc td { color: #c0392b; font-weight: bold; }
 
-  .inv-summary { display: flex; justify-content: flex-end; margin-top: 6px; }
-  .inv-summary table { border-collapse: collapse; font-size: 13px; width: 260px; }
-  .inv-summary td { padding: 5px 10px; border-bottom: 1px solid #ddd; }
-  .inv-summary td:first-child { text-align: left; font-weight: bold; }
+  .inv-summary { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .inv-summary table { border-collapse: collapse; font-size: 13px; width: 270px; }
+  .inv-summary td { padding: 5px 12px; border-bottom: 1px solid #ddd; }
+  .inv-summary td:first-child { font-weight: bold; }
   .inv-summary td:last-child { text-align: right; }
-  .inv-summary tr.total-row td {
+  .inv-summary .total td {
     border-top: 2px solid #333; border-bottom: 2px double #333;
-    font-size: 16px; font-weight: bold; padding: 8px 10px;
+    font-size: 17px; font-weight: bold; padding: 9px 12px;
   }
 
   .inv-footer {
-    position: absolute; bottom: 8mm; left: 18mm; right: 18mm;
-    font-size: 12px; line-height: 1.8;
+    position: absolute; bottom: 30px; left: 68px; right: 68px;
+    font-size: 13px; line-height: 1.8;
     border-top: 1px solid #999; padding-top: 10px;
   }
-  .inv-footer-bank { font-weight: bold; font-size: 13px; }
+  .inv-footer b { font-size: 14px; }
+
+  /* ===== ローディング ===== */
+  #loading {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.7);
+    justify-content: center; align-items: center; flex-direction: column;
+  }
+  #loading.on { display: flex; }
+  #loading .sp {
+    width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2);
+    border-top-color: #e94560; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  #loading p { color: #fff; font-family: sans-serif; font-size: 15px; margin-top: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== 画像モーダル ===== */
+  #img-modal {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.92);
+    flex-direction: column; justify-content: center; align-items: center;
+    padding: 16px;
+  }
+  #img-modal.on { display: flex; }
+  #img-modal .hint {
+    color: #fff; font-size: 15px; font-family: sans-serif;
+    margin-bottom: 10px; text-align: center;
+  }
+  #img-modal img {
+    max-width: 94vw; max-height: 70vh;
+    border: 2px solid #fff; border-radius: 4px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  }
+  #img-modal .modal-btns {
+    margin-top: 14px; display: flex; gap: 10px; width: 100%; max-width: 340px;
+  }
+  #img-modal .modal-btns a, #img-modal .modal-btns button {
+    flex: 1; padding: 12px; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: bold; font-family: sans-serif;
+    text-align: center; text-decoration: none; cursor: pointer;
+  }
+  #img-modal .dl-btn { background: #e94560; color: #fff; }
+  #img-modal .close-btn { background: #555; color: #fff; }
 </style>
 </head>
 <body>
 
+<!-- 入力 -->
 <div id="input-panel">
-  <div class="input-group">
-    <label>請求合計金額（税込・1円単位OK）</label>
-    <input type="number" id="inp-amount" placeholder="例: 1234" min="1" step="1" inputmode="numeric">
+  <div class="input-row">
+    <div class="field">
+      <label>請求合計（税込・1円単位OK）</label>
+      <input type="number" id="inp-amount" placeholder="例: 30000" min="1" step="1" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>請求日</label>
+      <input type="date" id="inp-date">
+    </div>
   </div>
-  <div class="input-group">
-    <label>請求日</label>
-    <input type="date" id="inp-date">
-  </div>
-  <div class="btn-group">
+  <div class="btn-row">
     <button id="btn-calc" onclick="calculate()">計算・プレビュー</button>
     <button id="btn-save" onclick="saveImage()" disabled>📷 画像保存</button>
   </div>
-  <div id="msg-area">
-    <div id="error-msg"></div>
-    <div id="success-msg"></div>
+  <div id="msg"></div>
+</div>
+
+<!-- ローディング -->
+<div id="loading"><div class="sp"></div><p>画像生成中...</p></div>
+
+<!-- 画像モーダル -->
+<div id="img-modal">
+  <div class="hint">📱 画像を長押しして保存</div>
+  <img id="modal-img" src="" alt="請求書">
+  <div class="modal-btns">
+    <a id="modal-dl" href="" download="請求書.png" class="dl-btn">⬇ 保存</a>
+    <button class="close-btn" onclick="document.getElementById('img-modal').classList.remove('on')">✕ 閉じる</button>
   </div>
 </div>
 
-<div id="loading-overlay"><div class="spinner"></div><p>画像生成中...</p></div>
-
-<div id="preview-area">
+<!-- プレビュー -->
+<div id="preview-wrap">
   <div id="invoice">
     <div class="inv-title">請　求　書</div>
+
     <div class="inv-header">
       <div class="inv-header-left">
-        <div class="inv-to">請求先:</div>
-        <div class="inv-to-name">株式会社　美高商事<span class="inv-to-sama">御中</span></div>
-        <div style="font-size:13px; margin-top:4px;">福島県白河市萱根長木原５－１</div>
+        <div class="inv-to-label">請求先:</div>
+        <div class="inv-to-name">株式会社　美高商事<span class="inv-to-suffix">御中</span></div>
+        <div class="inv-to-addr">福島県白河市萱根長木原５－１</div>
       </div>
       <div class="inv-header-right">
-        請求書番号: <br>
+        請求書番号:<br>
         請求日: <span id="disp-date">（日付）</span>
       </div>
     </div>
+
     <div class="inv-from">
       <span class="inv-from-name">井上　茉奈</span><br>
       住所: 福島県白河市みさか２丁目２８−１１<br>
@@ -239,11 +226,11 @@
     <table class="inv-table">
       <thead>
         <tr>
-          <th style="width:60px">品目番号</th>
+          <th style="width:55px">品目番号</th>
           <th>説明</th>
-          <th style="width:55px">数量</th>
-          <th style="width:70px">単価</th>
-          <th style="width:60px">割引率</th>
+          <th style="width:50px">数量</th>
+          <th style="width:65px">単価</th>
+          <th style="width:55px">割引率</th>
           <th style="width:80px">価格</th>
         </tr>
       </thead>
@@ -252,19 +239,17 @@
 
     <div class="inv-summary">
       <table>
-        <tr><td>請求書小計</td><td id="disp-subtotal">0</td></tr>
+        <tr><td>請求書小計</td><td id="d-sub">0</td></tr>
         <tr><td>税率</td><td>10%</td></tr>
-        <tr><td>消費税</td><td id="disp-tax">0</td></tr>
+        <tr><td>消費税</td><td id="d-tax">0</td></tr>
         <tr><td>その他</td><td></td></tr>
         <tr><td>前金受領済み</td><td></td></tr>
-        <tr class="total-row"><td>集計</td><td id="disp-total">0</td></tr>
+        <tr class="total"><td>集計</td><td id="d-total">0</td></tr>
       </table>
     </div>
 
     <div class="inv-footer">
-      <div class="inv-footer-bank">
-        お振込み先: 東邦銀行　白河西支店　普通　５８７０９０
-      </div>
+      <b>お振込み先: 東邦銀行　白河西支店　普通　５８７０９０</b>
     </div>
   </div>
 </div>
@@ -276,285 +261,188 @@ const ITEMS = [
   { name: 'ストラップ',   price: 100 },
   { name: 'しおり',       price:  50 },
 ];
-const TOTAL_ROWS = 12;
-const TAX_RATE = 0.1;
+const ROWS = 12;
 
+// ===== スケーリング =====
+function scaleInvoice() {
+  const inv = document.getElementById('invoice');
+  const wrap = document.getElementById('preview-wrap');
+  const wrapW = wrap.clientWidth - 16;
+  const invW = 794;
+  const s = Math.min(1, wrapW / invW);
+  inv.style.transform = `scale(${s})`;
+  inv.style.transformOrigin = 'top center';
+  // 高さ調整（縮小した分だけ余白削る）
+  const invH = 1123;
+  wrap.style.height = (invH * s + 24) + 'px';
+}
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inp-date').value = new Date().toISOString().slice(0, 10);
-  renderInvoice([
+  scaleInvoice();
+  // 初期表示
+  renderTable([
     { name: 'ブレスレット', qty: 1, price: 300 },
     { name: 'ネックレス',   qty: 1, price: 500 },
     { name: 'ストラップ',   qty: 1, price: 100 },
     { name: 'しおり',       qty: 1, price:  50 },
   ], 900, 90, 990);
 });
+window.addEventListener('resize', scaleInvoice);
 
-function formatDate(d) {
+// ===== ユーティリティ =====
+function fmt(n) { return n.toLocaleString('ja-JP'); }
+function fmtDate(d) {
   return `${d.getFullYear()}年${String(d.getMonth()+1).padStart(2,'0')}月${String(d.getDate()).padStart(2,'0')}日`;
 }
-function formatNum(n) { return n.toLocaleString('ja-JP'); }
-
-/**
- * 税込金額 → 小計・税を逆算
- */
-function findSubtotal(total) {
-  const approx = Math.round(total / 1.1);
-  for (let s = approx - 2; s <= approx + 2; s++) {
-    if (s < 0) continue;
-    if (s + Math.round(s * TAX_RATE) === total) {
-      return { subtotal: s, tax: Math.round(s * TAX_RATE) };
-    }
-  }
-  // 完全一致なし → 切り捨てで小計決定、端数は税に吸収
-  const sub = Math.floor(total / 1.1);
-  return { subtotal: sub, tax: total - sub };
+function msg(text, ok) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = ok ? 'ok' : 'err';
 }
 
-/**
- * 小計 → 明細行を生成
- * 各商品の金額がほぼ均等になるよう数量配分し、端数は値引き行で調整
- */
+// ===== 逆算 =====
+function findSubtotal(total) {
+  const a = Math.round(total / 1.1);
+  for (let s = a - 2; s <= a + 2; s++) {
+    if (s >= 0 && s + Math.round(s * 0.1) === total) return { sub: s, tax: Math.round(s * 0.1) };
+  }
+  const s = Math.floor(total / 1.1);
+  return { sub: s, tax: total - s };
+}
+
+// ===== 均等配分 + 値引き =====
 function buildLines(subtotal) {
   if (subtotal <= 0) return [];
-
   const lines = [];
-  const targetPerItem = subtotal / ITEMS.length;
+  const target = subtotal / ITEMS.length;
+  const qtys = ITEMS.map(item => Math.max(1, Math.round(target / item.price)));
+  let sum = ITEMS.reduce((s, item, i) => s + item.price * qtys[i], 0);
 
-  // 各商品にほぼ均等な金額になるよう数量を割り当て
-  let qtys = ITEMS.map(item => {
-    const q = Math.max(1, Math.round(targetPerItem / item.price));
-    return q;
-  });
-
-  // 現在の合計を計算
-  let currentSum = ITEMS.reduce((s, item, i) => s + item.price * qtys[i], 0);
-
-  // 合計が小計に近づくよう微調整（安い商品の数量を増減）
-  // 超過している場合: 高額品から数量を減らす
-  // 不足している場合: 安い品から数量を増やす
-  let maxIter = 200;
-  while (currentSum !== subtotal && maxIter-- > 0) {
-    const diff = subtotal - currentSum;
-
+  let iter = 200;
+  while (sum !== subtotal && iter-- > 0) {
+    const diff = subtotal - sum;
     if (diff > 0) {
-      // 不足 → 追加できる最適な商品を探す
-      let bestIdx = -1, bestDiff = Infinity;
+      let bi = -1, bd = Infinity;
       for (let i = 0; i < ITEMS.length; i++) {
-        const newDiff = Math.abs(diff - ITEMS[i].price);
-        if (ITEMS[i].price <= diff && newDiff < bestDiff) {
-          bestDiff = newDiff;
-          bestIdx = i;
-        }
+        const nd = Math.abs(diff - ITEMS[i].price);
+        if (ITEMS[i].price <= diff && nd < bd) { bd = nd; bi = i; }
       }
-      if (bestIdx === -1) break; // これ以上追加できない
-      qtys[bestIdx]++;
-      currentSum += ITEMS[bestIdx].price;
+      if (bi === -1) break;
+      qtys[bi]++; sum += ITEMS[bi].price;
     } else {
-      // 超過 → 減らせる最適な商品を探す
-      let bestIdx = -1, bestDiff = Infinity;
+      let bi = -1, bd = Infinity;
       for (let i = 0; i < ITEMS.length; i++) {
         if (qtys[i] <= 0) continue;
-        const newDiff = Math.abs(Math.abs(diff) - ITEMS[i].price);
-        if (ITEMS[i].price <= Math.abs(diff) && newDiff < bestDiff) {
-          bestDiff = newDiff;
-          bestIdx = i;
-        }
+        const nd = Math.abs(Math.abs(diff) - ITEMS[i].price);
+        if (ITEMS[i].price <= Math.abs(diff) && nd < bd) { bd = nd; bi = i; }
       }
-      if (bestIdx === -1) {
-        // 減らせる商品がない場合、数量>1の最安品から1つ減らす
+      if (bi === -1) {
         for (let i = ITEMS.length - 1; i >= 0; i--) {
-          if (qtys[i] > 1) { qtys[i]--; currentSum -= ITEMS[i].price; break; }
+          if (qtys[i] > 1) { qtys[i]--; sum -= ITEMS[i].price; break; }
         }
-        if (currentSum === subtotal) break;
         continue;
       }
-      qtys[bestIdx]--;
-      currentSum -= ITEMS[bestIdx].price;
+      qtys[bi]--; sum -= ITEMS[bi].price;
     }
   }
 
-  // 商品行を生成（数量>0のみ）
   for (let i = 0; i < ITEMS.length; i++) {
-    if (qtys[i] > 0) {
-      lines.push({ name: ITEMS[i].name, qty: qtys[i], price: ITEMS[i].price });
-    }
+    if (qtys[i] > 0) lines.push({ name: ITEMS[i].name, qty: qtys[i], price: ITEMS[i].price });
   }
 
-  // 端数処理: currentSum != subtotal の場合、しおり追加 + 値引き
-  const remain = subtotal - currentSum;
+  const remain = subtotal - sum;
   if (remain > 0 && remain < 50) {
-    const discountAmt = 50 - remain;
     const existing = lines.find(l => l.name === 'しおり');
-    if (existing) {
-      existing.qty += 1;
-    } else {
-      lines.push({ name: 'しおり', qty: 1, price: 50 });
-    }
-    lines.push({ name: '値引き', qty: 1, price: -discountAmt, isDiscount: true });
+    if (existing) existing.qty += 1; else lines.push({ name: 'しおり', qty: 1, price: 50 });
+    lines.push({ name: '値引き', qty: 1, price: -(50 - remain), isDisc: true });
   }
-
   return lines;
 }
 
-function renderInvoice(lines, subtotal, tax, total) {
+// ===== テーブル描画 =====
+function renderTable(lines, sub, tax, total) {
   const tbody = document.getElementById('inv-tbody');
   tbody.innerHTML = '';
-  let rowCount = 0;
-
-  for (const line of lines) {
+  let r = 0;
+  for (const l of lines) {
     const tr = document.createElement('tr');
-    const lineTotal = line.qty * line.price;
-
-    if (line.isDiscount) {
-      tr.className = 'discount-row';
-      tr.innerHTML = `
-        <td></td>
-        <td>${line.name}</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td>${formatNum(lineTotal)}</td>
-      `;
+    const lt = l.qty * l.price;
+    if (l.isDisc) {
+      tr.className = 'disc';
+      tr.innerHTML = `<td></td><td>${l.name}</td><td></td><td></td><td></td><td>${fmt(lt)}</td>`;
     } else {
-      tr.innerHTML = `
-        <td></td>
-        <td>${line.name}</td>
-        <td>${line.qty}</td>
-        <td>${formatNum(line.price)}</td>
-        <td></td>
-        <td>${formatNum(lineTotal)}</td>
-      `;
+      tr.innerHTML = `<td></td><td>${l.name}</td><td>${l.qty}</td><td>${fmt(l.price)}</td><td></td><td>${fmt(lt)}</td>`;
     }
-    tbody.appendChild(tr);
-    rowCount++;
+    tbody.appendChild(tr); r++;
   }
-
-  for (let i = rowCount; i < TOTAL_ROWS; i++) {
-    const tr = document.createElement('tr');
-    tr.className = 'empty-row';
+  for (; r < ROWS; r++) {
+    const tr = document.createElement('tr'); tr.className = 'empty';
     tr.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td>0</td>';
     tbody.appendChild(tr);
   }
-
-  document.getElementById('disp-subtotal').textContent = formatNum(subtotal);
-  document.getElementById('disp-tax').textContent = formatNum(tax);
-  document.getElementById('disp-total').textContent = formatNum(total);
+  document.getElementById('d-sub').textContent = fmt(sub);
+  document.getElementById('d-tax').textContent = fmt(tax);
+  document.getElementById('d-total').textContent = fmt(total);
 }
 
+// ===== 計算 =====
 function calculate() {
-  const errEl = document.getElementById('error-msg');
-  const sucEl = document.getElementById('success-msg');
-  errEl.textContent = ''; sucEl.textContent = '';
-
   const amount = parseInt(document.getElementById('inp-amount').value, 10);
   const dateStr = document.getElementById('inp-date').value;
+  if (!amount || amount < 1) { msg('⚠ 金額を入力してください', false); return; }
 
-  if (!amount || amount < 1) {
-    errEl.textContent = '⚠ 金額を1以上の整数で入力してください';
-    return;
-  }
-
-  const { subtotal, tax } = findSubtotal(amount);
-  const lines = buildLines(subtotal);
-
-  // 検算
+  const { sub, tax } = findSubtotal(amount);
+  const lines = buildLines(sub);
   const lineSum = lines.reduce((s, l) => s + l.qty * l.price, 0);
-  if (lineSum !== subtotal) {
-    errEl.textContent = `⚠ 内部計算エラー: 明細合計${lineSum} ≠ 小計${subtotal}`;
-    return;
-  }
+  if (lineSum !== sub) { msg('⚠ 計算エラー', false); return; }
 
-  if (dateStr) {
-    document.getElementById('disp-date').textContent = formatDate(new Date(dateStr + 'T00:00:00'));
-  }
-
-  renderInvoice(lines, subtotal, tax, amount);
+  if (dateStr) document.getElementById('disp-date').textContent = fmtDate(new Date(dateStr + 'T00:00:00'));
+  renderTable(lines, sub, tax, amount);
   document.getElementById('btn-save').disabled = false;
 
-  const discLine = lines.find(l => l.isDiscount);
-  const discMsg = discLine ? `（値引き ${formatNum(discLine.price)}円）` : '';
-  sucEl.textContent = `✓ 小計 ¥${formatNum(subtotal)} + 税 ¥${formatNum(tax)} = ¥${formatNum(amount)} ${discMsg}`;
+  const disc = lines.find(l => l.isDisc);
+  const dm = disc ? `（値引き ${fmt(disc.price)}円）` : '';
+  msg(`✓ 小計¥${fmt(sub)} + 税¥${fmt(tax)} = ¥${fmt(amount)} ${dm}`, true);
 }
 
+// ===== 画像保存 =====
 function saveImage() {
-  const el = document.getElementById('invoice');
-  const panel = document.getElementById('input-panel');
-  const loader = document.getElementById('loading-overlay');
+  const inv = document.getElementById('invoice');
+  const loader = document.getElementById('loading');
+  loader.classList.add('on');
 
-  loader.querySelector('p').textContent = '画像生成中...';
-  loader.classList.add('show');
-
-  // モバイルのCSS transformを一時解除
-  const origTransform = el.style.transform;
-  const origTransformOrigin = el.style.transformOrigin;
-  const origMarginBottom = el.style.marginBottom;
-  const origMaxHeight = el.style.maxHeight;
-  const origMinHeight = el.style.minHeight;
-
-  el.style.transform = 'none';
-  el.style.transformOrigin = 'top left';
-  el.style.marginBottom = '0';
-  el.style.maxHeight = '297mm';
-  el.style.minHeight = '297mm';
-
-  panel.style.display = 'none';
-  window.scrollTo(0, 0);
-
-  function restore() {
-    el.style.transform = origTransform;
-    el.style.transformOrigin = origTransformOrigin;
-    el.style.marginBottom = origMarginBottom;
-    el.style.maxHeight = origMaxHeight;
-    el.style.minHeight = origMinHeight;
-    panel.style.display = 'flex';
-    loader.classList.remove('show');
-  }
+  // オフスクリーンでフルサイズの請求書をクローンしてキャプチャ
+  const clone = inv.cloneNode(true);
+  clone.style.transform = 'none';
+  clone.style.width = '794px';
+  clone.style.height = '1123px';
+  clone.style.position = 'fixed';
+  clone.style.top = '-9999px';
+  clone.style.left = '-9999px';
+  clone.style.zIndex = '-1';
+  document.body.appendChild(clone);
 
   setTimeout(() => {
-    html2canvas(el, {
-      scale: 3,
+    html2canvas(clone, {
+      scale: 2,
       useCORS: true,
-      width: el.scrollWidth,
-      height: el.scrollHeight,
-      windowWidth: 810,
-      scrollX: 0,
-      scrollY: 0,
+      width: 794,
+      height: 1123,
       backgroundColor: '#ffffff'
     }).then(canvas => {
-      restore();
+      document.body.removeChild(clone);
+      loader.classList.remove('on');
 
-      // 画像をプレビュー表示 → 長押し保存を促す
       const dataUrl = canvas.toDataURL('image/png');
-
-      // モーダルで画像表示
-      let modal = document.getElementById('img-modal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'img-modal';
-        modal.innerHTML = `
-          <div class="img-modal-bg" onclick="closeImgModal()"></div>
-          <div class="img-modal-content">
-            <p class="img-modal-hint">📱 画像を長押しして保存してください</p>
-            <img id="img-modal-img" src="" alt="請求書">
-            <button class="img-modal-close" onclick="closeImgModal()">✕ 閉じる</button>
-            <a id="img-modal-dl" href="" download="請求書_美高商事宛_井上茉奈.png" class="img-modal-dlbtn">⬇ ダウンロード</a>
-          </div>
-        `;
-        document.body.appendChild(modal);
-      }
-      document.getElementById('img-modal-img').src = dataUrl;
-      document.getElementById('img-modal-dl').href = dataUrl;
-      modal.style.display = 'flex';
+      document.getElementById('modal-img').src = dataUrl;
+      document.getElementById('modal-dl').href = dataUrl;
+      document.getElementById('img-modal').classList.add('on');
     }).catch(() => {
-      restore();
-      document.getElementById('error-msg').textContent = '⚠ 画像生成に失敗しました';
+      document.body.removeChild(clone);
+      loader.classList.remove('on');
+      msg('⚠ 画像生成に失敗しました', false);
     });
-  }, 100);
-}
-
-function closeImgModal() {
-  const modal = document.getElementById('img-modal');
-  if (modal) modal.style.display = 'none';
+  }, 50);
 }
 </script>
 </body>
