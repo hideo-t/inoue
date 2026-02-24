@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>請求書生成 - 井上茉奈 → 美高商事</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Yu Mincho', 'Hiragino Mincho ProN', 'MS PMincho', serif;
+    background: #f0f0f0; color: #222;
+  }
+
+  /* ===== 入力パネル ===== */
+  #input-panel {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: #1a1a2e; color: #fff; padding: 16px 24px;
+    display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  #input-panel label { font-size: 14px; font-family: sans-serif; }
+  #input-panel input {
+    padding: 8px 12px; border: none; border-radius: 6px;
+    font-size: 16px; width: 180px; background: #fff; color: #222;
+  }
+  #input-panel button {
+    padding: 10px 28px; border: none; border-radius: 6px;
+    font-size: 15px; font-weight: bold; cursor: pointer;
+    font-family: sans-serif; transition: all 0.2s;
+  }
+  #btn-calc { background: #e94560; color: #fff; }
+  #btn-calc:hover { background: #c73652; }
+  #btn-pdf { background: #0f3460; color: #fff; }
+  #btn-pdf:hover { background: #16213e; }
+  #btn-pdf:disabled { opacity: 0.4; cursor: not-allowed; }
+  #error-msg { color: #ff6b6b; font-size: 13px; font-family: sans-serif; min-height: 18px; }
+  #success-msg { color: #51cf66; font-size: 13px; font-family: sans-serif; }
+
+  /* ===== 請求書プレビュー ===== */
+  #preview-area {
+    margin-top: 90px; padding: 20px;
+    display: flex; justify-content: center;
+  }
+  #invoice {
+    width: 210mm; min-height: 297mm; max-height: 297mm;
+    background: #fff; padding: 18mm 18mm 15mm 18mm;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    position: relative; overflow: hidden;
+  }
+
+  .inv-title {
+    text-align: center; font-size: 28px; font-weight: bold;
+    letter-spacing: 12px; margin-bottom: 20px;
+    border-bottom: 3px double #333; padding-bottom: 10px;
+  }
+  .inv-header {
+    display: flex; justify-content: space-between; margin-bottom: 18px;
+  }
+  .inv-header-left { flex: 1; }
+  .inv-header-right { text-align: right; font-size: 13px; line-height: 1.8; }
+  .inv-to { font-size: 15px; margin-bottom: 4px; }
+  .inv-to-name {
+    font-size: 22px; font-weight: bold;
+    border-bottom: 2px solid #333; padding-bottom: 4px;
+    display: inline-block; padding-right: 20px; margin-bottom: 10px;
+  }
+  .inv-to-sama { font-size: 15px; font-weight: normal; margin-left: 8px; }
+  .inv-from {
+    text-align: right; font-size: 13px; line-height: 1.9; margin-bottom: 18px;
+  }
+  .inv-from-name { font-size: 17px; font-weight: bold; }
+
+  .inv-table {
+    width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px;
+  }
+  .inv-table thead th {
+    background: #2c3e50; color: #fff;
+    padding: 7px 8px; font-weight: bold; text-align: center; font-size: 12px;
+  }
+  .inv-table tbody td {
+    padding: 5px 8px; border-bottom: 1px solid #ddd; text-align: center;
+  }
+  .inv-table tbody td:nth-child(2) { text-align: left; }
+  .inv-table tbody td:last-child { text-align: right; }
+  .inv-table tbody td:nth-child(4),
+  .inv-table tbody td:nth-child(6) { text-align: right; }
+  .inv-table tbody tr.empty-row td { color: #ccc; height: 22px; }
+  .inv-table tbody tr.discount-row td { color: #c0392b; font-weight: bold; }
+
+  .inv-summary { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .inv-summary table { border-collapse: collapse; font-size: 13px; width: 260px; }
+  .inv-summary td { padding: 5px 10px; border-bottom: 1px solid #ddd; }
+  .inv-summary td:first-child { text-align: left; font-weight: bold; }
+  .inv-summary td:last-child { text-align: right; }
+  .inv-summary tr.total-row td {
+    border-top: 2px solid #333; border-bottom: 2px double #333;
+    font-size: 16px; font-weight: bold; padding: 8px 10px;
+  }
+
+  .inv-footer {
+    position: absolute; bottom: 8mm; left: 18mm; right: 18mm;
+    font-size: 12px; line-height: 1.8;
+    border-top: 1px solid #999; padding-top: 10px;
+  }
+  .inv-footer-bank { font-weight: bold; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="input-panel">
+  <div>
+    <label>請求合計金額（税込・1円単位OK）</label><br>
+    <input type="number" id="inp-amount" placeholder="例: 1234" min="1" step="1">
+  </div>
+  <div>
+    <label>請求日</label><br>
+    <input type="date" id="inp-date">
+  </div>
+  <button id="btn-calc" onclick="calculate()">計算・プレビュー</button>
+  <button id="btn-pdf" onclick="generatePDF()" disabled>PDF出力</button>
+  <div>
+    <div id="error-msg"></div>
+    <div id="success-msg"></div>
+  </div>
+</div>
+
+<div id="preview-area">
+  <div id="invoice">
+    <div class="inv-title">請　求　書</div>
+    <div class="inv-header">
+      <div class="inv-header-left">
+        <div class="inv-to">請求先:</div>
+        <div class="inv-to-name">株式会社　美高商事<span class="inv-to-sama">御中</span></div>
+        <div style="font-size:13px; margin-top:4px;">福島県白河市萱根長木原５－１</div>
+      </div>
+      <div class="inv-header-right">
+        請求書番号: <br>
+        請求日: <span id="disp-date">（日付）</span>
+      </div>
+    </div>
+    <div class="inv-from">
+      <span class="inv-from-name">井上　茉奈</span><br>
+      住所: 福島県白河市みさか２丁目２８−１１<br>
+      電話:<br>FAX:<br>メール:
+    </div>
+
+    <table class="inv-table">
+      <thead>
+        <tr>
+          <th style="width:60px">品目番号</th>
+          <th>説明</th>
+          <th style="width:55px">数量</th>
+          <th style="width:70px">単価</th>
+          <th style="width:60px">割引率</th>
+          <th style="width:80px">価格</th>
+        </tr>
+      </thead>
+      <tbody id="inv-tbody"></tbody>
+    </table>
+
+    <div class="inv-summary">
+      <table>
+        <tr><td>請求書小計</td><td id="disp-subtotal">0</td></tr>
+        <tr><td>税率</td><td>10%</td></tr>
+        <tr><td>消費税</td><td id="disp-tax">0</td></tr>
+        <tr><td>その他</td><td></td></tr>
+        <tr><td>前金受領済み</td><td></td></tr>
+        <tr class="total-row"><td>集計</td><td id="disp-total">0</td></tr>
+      </table>
+    </div>
+
+    <div class="inv-footer">
+      <div class="inv-footer-bank">
+        お振込み先: 東邦銀行　白河西支店　普通　５８７０９０
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  { name: 'ネックレス',   price: 500 },
+  { name: 'ブレスレット', price: 300 },
+  { name: 'ストラップ',   price: 100 },
+  { name: 'しおり',       price:  50 },
+];
+const TOTAL_ROWS = 12;
+const TAX_RATE = 0.1;
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('inp-date').value = new Date().toISOString().slice(0, 10);
+  renderInvoice([
+    { name: 'ブレスレット', qty: 1, price: 300 },
+    { name: 'ネックレス',   qty: 1, price: 500 },
+    { name: 'ストラップ',   qty: 1, price: 100 },
+    { name: 'しおり',       qty: 1, price:  50 },
+  ], 900, 90, 990);
+});
+
+function formatDate(d) {
+  return `${d.getFullYear()}年${String(d.getMonth()+1).padStart(2,'0')}月${String(d.getDate()).padStart(2,'0')}日`;
+}
+function formatNum(n) { return n.toLocaleString('ja-JP'); }
+
+/**
+ * 税込金額 → 小計・税を逆算
+ */
+function findSubtotal(total) {
+  const approx = Math.round(total / 1.1);
+  for (let s = approx - 2; s <= approx + 2; s++) {
+    if (s < 0) continue;
+    if (s + Math.round(s * TAX_RATE) === total) {
+      return { subtotal: s, tax: Math.round(s * TAX_RATE) };
+    }
+  }
+  // 完全一致なし → 切り捨てで小計決定、端数は税に吸収
+  const sub = Math.floor(total / 1.1);
+  return { subtotal: sub, tax: total - sub };
+}
+
+/**
+ * 小計 → 明細行を生成
+ * 各商品の金額がほぼ均等になるよう数量配分し、端数は値引き行で調整
+ */
+function buildLines(subtotal) {
+  if (subtotal <= 0) return [];
+
+  const lines = [];
+  const targetPerItem = subtotal / ITEMS.length;
+
+  // 各商品にほぼ均等な金額になるよう数量を割り当て
+  let qtys = ITEMS.map(item => {
+    const q = Math.max(1, Math.round(targetPerItem / item.price));
+    return q;
+  });
+
+  // 現在の合計を計算
+  let currentSum = ITEMS.reduce((s, item, i) => s + item.price * qtys[i], 0);
+
+  // 合計が小計に近づくよう微調整（安い商品の数量を増減）
+  // 超過している場合: 高額品から数量を減らす
+  // 不足している場合: 安い品から数量を増やす
+  let maxIter = 200;
+  while (currentSum !== subtotal && maxIter-- > 0) {
+    const diff = subtotal - currentSum;
+
+    if (diff > 0) {
+      // 不足 → 追加できる最適な商品を探す
+      let bestIdx = -1, bestDiff = Infinity;
+      for (let i = 0; i < ITEMS.length; i++) {
+        const newDiff = Math.abs(diff - ITEMS[i].price);
+        if (ITEMS[i].price <= diff && newDiff < bestDiff) {
+          bestDiff = newDiff;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx === -1) break; // これ以上追加できない
+      qtys[bestIdx]++;
+      currentSum += ITEMS[bestIdx].price;
+    } else {
+      // 超過 → 減らせる最適な商品を探す
+      let bestIdx = -1, bestDiff = Infinity;
+      for (let i = 0; i < ITEMS.length; i++) {
+        if (qtys[i] <= 0) continue;
+        const newDiff = Math.abs(Math.abs(diff) - ITEMS[i].price);
+        if (ITEMS[i].price <= Math.abs(diff) && newDiff < bestDiff) {
+          bestDiff = newDiff;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx === -1) {
+        // 減らせる商品がない場合、数量>1の最安品から1つ減らす
+        for (let i = ITEMS.length - 1; i >= 0; i--) {
+          if (qtys[i] > 1) { qtys[i]--; currentSum -= ITEMS[i].price; break; }
+        }
+        if (currentSum === subtotal) break;
+        continue;
+      }
+      qtys[bestIdx]--;
+      currentSum -= ITEMS[bestIdx].price;
+    }
+  }
+
+  // 商品行を生成（数量>0のみ）
+  for (let i = 0; i < ITEMS.length; i++) {
+    if (qtys[i] > 0) {
+      lines.push({ name: ITEMS[i].name, qty: qtys[i], price: ITEMS[i].price });
+    }
+  }
+
+  // 端数処理: currentSum != subtotal の場合、しおり追加 + 値引き
+  const remain = subtotal - currentSum;
+  if (remain > 0 && remain < 50) {
+    const discountAmt = 50 - remain;
+    const existing = lines.find(l => l.name === 'しおり');
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      lines.push({ name: 'しおり', qty: 1, price: 50 });
+    }
+    lines.push({ name: '値引き', qty: 1, price: -discountAmt, isDiscount: true });
+  }
+
+  return lines;
+}
+
+function renderInvoice(lines, subtotal, tax, total) {
+  const tbody = document.getElementById('inv-tbody');
+  tbody.innerHTML = '';
+  let rowCount = 0;
+
+  for (const line of lines) {
+    const tr = document.createElement('tr');
+    const lineTotal = line.qty * line.price;
+
+    if (line.isDiscount) {
+      tr.className = 'discount-row';
+      tr.innerHTML = `
+        <td></td>
+        <td>${line.name}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td>${formatNum(lineTotal)}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td></td>
+        <td>${line.name}</td>
+        <td>${line.qty}</td>
+        <td>${formatNum(line.price)}</td>
+        <td></td>
+        <td>${formatNum(lineTotal)}</td>
+      `;
+    }
+    tbody.appendChild(tr);
+    rowCount++;
+  }
+
+  for (let i = rowCount; i < TOTAL_ROWS; i++) {
+    const tr = document.createElement('tr');
+    tr.className = 'empty-row';
+    tr.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td>0</td>';
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById('disp-subtotal').textContent = formatNum(subtotal);
+  document.getElementById('disp-tax').textContent = formatNum(tax);
+  document.getElementById('disp-total').textContent = formatNum(total);
+}
+
+function calculate() {
+  const errEl = document.getElementById('error-msg');
+  const sucEl = document.getElementById('success-msg');
+  errEl.textContent = ''; sucEl.textContent = '';
+
+  const amount = parseInt(document.getElementById('inp-amount').value, 10);
+  const dateStr = document.getElementById('inp-date').value;
+
+  if (!amount || amount < 1) {
+    errEl.textContent = '⚠ 金額を1以上の整数で入力してください';
+    return;
+  }
+
+  const { subtotal, tax } = findSubtotal(amount);
+  const lines = buildLines(subtotal);
+
+  // 検算
+  const lineSum = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  if (lineSum !== subtotal) {
+    errEl.textContent = `⚠ 内部計算エラー: 明細合計${lineSum} ≠ 小計${subtotal}`;
+    return;
+  }
+
+  if (dateStr) {
+    document.getElementById('disp-date').textContent = formatDate(new Date(dateStr + 'T00:00:00'));
+  }
+
+  renderInvoice(lines, subtotal, tax, amount);
+  document.getElementById('btn-pdf').disabled = false;
+
+  const discLine = lines.find(l => l.isDiscount);
+  const discMsg = discLine ? `（値引き ${formatNum(discLine.price)}円）` : '';
+  sucEl.textContent = `✓ 小計 ¥${formatNum(subtotal)} + 税 ¥${formatNum(tax)} = ¥${formatNum(amount)} ${discMsg}`;
+}
+
+function generatePDF() {
+  const el = document.getElementById('invoice');
+  document.getElementById('input-panel').style.display = 'none';
+  html2pdf().set({
+    margin: 0,
+    filename: '請求書_美高商事宛_井上茉奈.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(el).save().then(() => {
+    document.getElementById('input-panel').style.display = 'flex';
+  });
+}
+</script>
+</body>
+</html>
